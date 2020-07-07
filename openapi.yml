@@ -1,0 +1,535 @@
+openapi: 3.0.0
+info:
+  title: Uphold Payouts API
+  version: 1.0.0
+  contact:
+    name: 'Uphold, Inc.'
+    email: developers@uphold.com
+    url: 'https://developer.uphold.com'
+  termsOfService: 'https://uphold.com/en/legal/developer-agreement'
+  license:
+    name: All Rights Reserved © Uphold
+  description: >-
+    Welcome to the Uphold API, we’re glad to have you! Provided here is all the
+    documentation you need to help you create custom and revolutionary new
+    services powered by the Uphold Platform. With your ingenuity, together we
+    can serve the needs of individuals and organizations across the globe and
+    change the financial services ecosystem forever.
+servers:
+  - url: 'https://api.uphold.com/v0'
+    description: Production server
+  - url: 'https://api-sandbox.uphold.com/v0'
+    description: Sandbox server (paper money)
+externalDocs:
+  description: Developer Documentation
+  url: 'https://uphold.com/en/developer/api/documentation'
+tags:
+  - name: Payouts
+  - name: Transactions
+paths:
+  '/me/cards/{card}/payouts':
+    parameters:
+      - name: card
+        in: path
+        description: ID of the card
+        example: 13440cf3-dde5-479c-a79f-b3fee64059ef
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Payouts
+      summary: Retrieve payouts associated with this card
+      description: |
+        Returns a list of payouts, including `processing` and `completed`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: >-
+                  #/paths/~1me~1cards~1%7Bcard%7D~1payouts/post/responses/200/content/application~1json/schema
+      responses:
+        '200':
+          description: List of payouts
+          content:
+            application/json:
+              example:
+                - id: bbf29939-b2f5-4ae5-a026-06fb0c8f0961
+                  status: processing
+                - id: 99980010-d221-4905-94ed-d1e252f255d3
+                  status: completed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+        - client-credentials: []
+      operationId: get-payouts
+    post:
+      tags:
+        - Payouts
+      summary: Create a payout to multiple destinations
+      description: >
+        This endpoint will allow you to send a single request to create multiple
+        payments at once.
+
+
+        There is no associated `quote`, and the transactions will all be
+        committed as soon as possible as if they were being created with
+        `?commit=true` at the time of execution.
+
+
+        The order of transaction processing **is not guaranteed** and may not
+        match the order of the array given. Always use the transaction _ID_ to
+        check the transaction's result.
+      parameters:
+        - schema:
+            type: string
+          in: header
+          name: Signature
+          description: >-
+            If a Signature header is present, it will be validated against the
+            card's public key, according to the protected cards specification.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              title: CreatePayout
+              type: array
+              items:
+                title: CreateTransaction
+                type: object
+                properties:
+                  ContactId:
+                    type: string
+                    format: uuid
+                  denomination:
+                    type: object
+                    properties:
+                      amount:
+                        type: string
+                        format: decimal
+                      currency:
+                        type: string
+                    required:
+                      - amount
+                      - currency
+                  destination:
+                    type: string
+                  message:
+                    type: string
+                  origin:
+                    type: string
+                  priority:
+                    type: string
+                    enum:
+                      - normal
+                      - fast
+                  reference:
+                    type: string
+                required:
+                  - denomination
+                  - destination
+                  - origin
+      responses:
+        '200':
+          description: Payout created
+          content:
+            application/json:
+              examples:
+                Payout Processing:
+                  value:
+                    id: bbf29939-b2f5-4ae5-a026-06fb0c8f0961
+                    status: processing
+              schema:
+                title: Payout
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                      - completed
+                      - processing
+        '400':
+          description: Validation Failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationFailedError'
+              examples:
+                Signature Invalid:
+                  value:
+                    code: validation_failed
+                    errors:
+                      signature:
+                        - code: invalid
+                          message: This value is not valid
+                Signature Required:
+                  value:
+                    code: validation_failed
+                    errors:
+                      signature:
+                        - code: required
+                          message: This value is required
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+        - client-credentials: []
+      operationId: create-payout
+  '/me/cards/{card}/payouts/{payout}':
+    parameters:
+      - name: card
+        in: path
+        description: ID of the card
+        example: 13440cf3-dde5-479c-a79f-b3fee64059ef
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: payout
+        in: path
+        description: ID of the payout
+        example: 87e534fa-9c8f-469f-b4a0-510c9b1a134b
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Payouts
+      summary: Retrieve a specific payout
+      description: >
+        Retrieves the current status of a payout. Due to the possible number of
+        transactions that can be included on a payout, the list of transactions
+        is available on a separate, paginated endpoint.
+      responses:
+        '200':
+          description: The payout with the `id` specified
+          content:
+            application/json:
+              schema:
+                $ref: >-
+                  #/paths/~1me~1cards~1%7Bcard%7D~1payouts/post/responses/200/content/application~1json/schema
+              example:
+                id: 6fc0e546-b722-4b2d-90ad-492742314bd4
+                status: processing
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+        - client-credentials: []
+      operationId: get-payout
+  '/me/cards/{card}/payouts/{payout}/transactions':
+    parameters:
+      - name: card
+        in: path
+        description: ID of the card
+        example: 13440cf3-dde5-479c-a79f-b3fee64059ef
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: payout
+        in: path
+        description: ID of the payout
+        example: 87e534fa-9c8f-469f-b4a0-510c9b1a134b
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - Transactions
+      summary: Retrieve transactions included in a payout
+      description: |
+        Retrieves a paginated list of transactions included in a payout
+      responses:
+        '200':
+          description: 'A list of transactions, limited to the default pagination maximum'
+          content:
+            application/json:
+              schema:
+                title: PayoutTransactions
+                type: array
+                items:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      enum:
+                        - completed
+                        - failed
+                        - processing
+                        - ready
+                    data:
+                      oneOf:
+                        - type: object
+                          properties:
+                            code:
+                              type: string
+                              example: validation_failed
+                            errors:
+                              type: object
+                        - title: Transaction
+                          type: object
+                          properties:
+                            application:
+                              type: object
+                            createdAt:
+                              type: string
+                              format: date-time
+                            denomination:
+                              type: object
+                            destination:
+                              type: object
+                            fees:
+                              type: array
+                              items:
+                                type: object
+                            id:
+                              type: string
+                              format: uuid
+                            message:
+                              type: string
+                            network:
+                              type: string
+                            normalized:
+                              type: array
+                              items:
+                                type: object
+                            origin:
+                              type: object
+                            params:
+                              type: object
+                            priority:
+                              type: string
+                              enum:
+                                - fast
+                                - normal
+                            reference:
+                              type: string
+                            status:
+                              type: string
+                              enum:
+                                - cancelled
+                                - cancelling
+                                - completed
+                                - failed
+                                - processing
+                                - waiting
+                            type:
+                              type: string
+                              enum:
+                                - deposit
+                                - transfer
+                                - withdrawal
+              examples:
+                All Transactions Successful:
+                  value:
+                    - $ref: >-
+                        #/paths/~1me~1cards~1%7Bcard%7D~1payouts~1%7Bpayout%7D~1transactions/get/responses/200/content/application~1json/examples/Mixed%20Transaction%20Status/value/2
+                    - $ref: >-
+                        #/paths/~1me~1cards~1%7Bcard%7D~1payouts~1%7Bpayout%7D~1transactions/get/responses/200/content/application~1json/examples/Mixed%20Transaction%20Status/value/2
+                Mixed Transaction Status:
+                  value:
+                    - denomination:
+                        amount: '10.00'
+                        currency: USD
+                      destination:
+                        amount: '10.00'
+                        currency: USD
+                      id: bbf29939-b2f5-4ae5-a026-06fb0c8f0961
+                      reference: my-merchant-id
+                      status: ready
+                    - createdAt: '2019-07-22T13:32:34.739Z'
+                      denomination:
+                        amount: '10.00'
+                        currency: USD
+                        pair: USDUSD
+                        rate: '1.00'
+                      fees: []
+                      id: bbf29939-b2f5-4ae5-a026-06fb0c8f0961
+                      network: uphold
+                      normalized:
+                        - amount: '10.00'
+                          commission: '0.00'
+                          currency: USD
+                          fee: '0.00'
+                          rate: '1.00000'
+                          target: origin
+                      params:
+                        currency: USD
+                        margin: '0.00'
+                        pair: USDUSD
+                        progress: '1'
+                        rate: '1.00'
+                        ttl: 3599999
+                        type: internal
+                      priority: normal
+                      status: processing
+                      type: transfer
+                      origin:
+                        amount: '10.00'
+                        base: '10.00'
+                        CardId: 76d1de22-9135-4bd4-ae28-66767550f1e9
+                        commission: '0.00'
+                        currency: USD
+                        description: Judah Quigley
+                        fee: '0.00'
+                        isMember: false
+                        node:
+                          id: 76d1de22-9135-4bd4-ae28-66767550f1e9
+                          type: card
+                          user:
+                            id: bec93a20-be31-47db-b11a-3fb0731b1c82
+                            username: Rae45
+                        rate: '1'
+                        sources: []
+                        type: card
+                        username: Rae45
+                      destination:
+                        amount: '10.00'
+                        base: '10.00'
+                        commission: '0.00'
+                        currency: USD
+                        description: Kamille Gibson
+                        fee: '0.00'
+                        isMember: false
+                        node:
+                          type: card
+                          user:
+                            id: 3e80d7f0-c089-4a55-9239-98c50ce0cc34
+                            username: Reta_Schultz24
+                        rate: '1'
+                        type: user
+                        username: Reta_Schultz24
+                    - createdAt: '2019-07-22T13:32:34.739Z'
+                      denomination:
+                        amount: '10.00'
+                        currency: USD
+                        pair: USDUSD
+                        rate: '1.00'
+                      fees: []
+                      id: bbf29939-b2f5-4ae5-a026-06fb0c8f0961
+                      network: uphold
+                      normalized:
+                        - amount: '10.00'
+                          commission: '0.00'
+                          currency: USD
+                          fee: '0.00'
+                          rate: '1.00000'
+                          target: origin
+                      params:
+                        currency: USD
+                        margin: '0.00'
+                        pair: USDUSD
+                        progress: '1'
+                        rate: '1.00'
+                        ttl: 3599999
+                        type: internal
+                      priority: normal
+                      status: completed
+                      type: transfer
+                      origin:
+                        amount: '10.00'
+                        base: '10.00'
+                        CardId: 76d1de22-9135-4bd4-ae28-66767550f1e9
+                        commission: '0.00'
+                        currency: USD
+                        description: Judah Quigley
+                        fee: '0.00'
+                        isMember: false
+                        node:
+                          id: 76d1de22-9135-4bd4-ae28-66767550f1e9
+                          type: card
+                          user:
+                            id: bec93a20-be31-47db-b11a-3fb0731b1c82
+                            username: Rae45
+                        rate: '1'
+                        sources: []
+                        type: card
+                        username: Rae45
+                      destination:
+                        amount: '10.00'
+                        base: '10.00'
+                        commission: '0.00'
+                        currency: USD
+                        description: Kamille Gibson
+                        fee: '0.00'
+                        isMember: false
+                        node:
+                          type: card
+                          user:
+                            id: 3e80d7f0-c089-4a55-9239-98c50ce0cc34
+                            username: Reta_Schultz24
+                        rate: '1'
+                        type: user
+                        username: Reta_Schultz24
+                    - code: 'validation_failed'
+                      errors:
+                        denomination:
+                          code: 'validation_failed'
+                          errors:
+                            amount: [{ code: 'sufficient_funds', message: 'Not enough funds for the specified amount' }]
+
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security:
+        - client-credentials: []
+      operationId: get-payout-transactions
+components:
+  schemas:
+    AbstractError:
+      type: object
+      properties:
+        code:
+          type: string
+          example: not_found
+        message:
+          type: string
+          example: Not Found
+    ValidationFailedError:
+      type: object
+      properties:
+        code:
+          type: string
+          example: validation_failed
+        errors:
+          type: object
+  securitySchemes:
+    client-credentials:
+      type: http
+      scheme: bearer
+      description: A client credentials bearer token
+  responses:
+    NotFound:
+      description: The specified resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AbstractError'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AbstractError'
+    ValidationFailed:
+      description: Invalid or missing parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationFailedError'
